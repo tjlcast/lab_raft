@@ -33,6 +33,7 @@ func randstring(n int) string {
 type config struct {
 	mu        sync.Mutex
 	t         *testing.T
+
 	net       *labrpc.Network 	// 模拟网络
 	n         int			// 服务器的数量
 	done      int32 		// tell internal threads to die
@@ -50,10 +51,11 @@ func make_config(t *testing.T, n int, unreliable bool) *config {
 	runtime.GOMAXPROCS(4)
 	cfg := &config{}
 	cfg.t = t
+
 	cfg.net = labrpc.MakeNetwork()		// 构建测试网络
 	cfg.n = n
-	cfg.applyErr = make([]string, cfg.n)
 	cfg.rafts = make([]*Raft, cfg.n)	//  构建cfg.n个Raft实例
+	cfg.applyErr = make([]string, cfg.n)
 	cfg.connected = make([]bool, cfg.n)
 	cfg.saved = make([]*Persister, cfg.n)
 	cfg.endnames = make([][]string, cfg.n)

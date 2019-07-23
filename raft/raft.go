@@ -204,8 +204,10 @@ func (rf *Raft) Kill() {
 // 建一个Raft端点。
 // peers参数是通往其他Raft端点处于连接状态下的RPC连接。
 // me参数是自己在端点数组中的索引。
-func Make(peers []*labrpc.ClientEnd, me int,
-	persister *Persister, applyCh chan ApplyMsg) *Raft {
+func Make(peers []*labrpc.ClientEnd,
+	me int,
+	persister *Persister,
+	applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister

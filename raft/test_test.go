@@ -20,7 +20,7 @@ import "sync"
 
 // 这个测试慷慨地允许解决方案在一秒钟完成选举（比论文中的超时范围多了很多）
 // 译注： 论文中的选举超时时间可能需要在 10 毫秒到 500 毫秒之间
-const RaftElectionTimeout = 1000 * time.Millisecond
+//const RaftElectionTimeout = 1000 * time.Millisecond
 
 // go test -v  -run TestInitialElection
 func TestInitialElection(t *testing.T) {

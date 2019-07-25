@@ -9,9 +9,9 @@ import (
 //
 // Raft tests.
 //
-// we will use the original test_test.go to test your code for grading.
+// we will use the original test_test.go to tips your code for grading.
 // so, while you can modify this code to help you debug, please
-// test with the original before submitting.
+// tips with the original before submitting.
 //
 
 

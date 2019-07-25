@@ -4,9 +4,9 @@ package labrpc
 // channel-based RPC, for 824 labs.
 // allows tests to disconnect RPC connections.
 //
-// we will use the original labrpc.go to test your code for grading.
+// we will use the original labrpc.go to tips your code for grading.
 // so, while you can modify this code to help you debug, please
-// test against the original before submitting.
+// tips against the original before submitting.
 //
 // adapted from Go net/rpc/server.go.
 //

@@ -17,12 +17,31 @@ package raft
 //   in the same server.
 //
 
-import "sync"
-import "lab_raft/labrpc"
+import (
+	"lab_raft/labrpc"
+	"time"
+	"math/rand"
+	"sync"
+)
 
 // import "bytes"
 // import "encoding/gob"
 
+
+/**
+	tips:
+	https://pdos.csail.mit.edu/6.824/labs/lab-raft.html						==> lab introduction
+	https://github.com/tjlcast/raft-zh_cn/blob/master/raft-zh_cn.md			==> raft paper
+	https://github.com/tjlcast/MIT-6.824/blob/master/src/raft/raft.go		==> init code repo
+	https://github.com/comiser/MIT-6.824-2016/blob/master/src/raft/raft.go	==> nice code
+**/
+
+// the state of raft node.
+const (
+	ROLE_FOLLOWER = iota
+	ROLE_LEADER
+	ROLE_CANDIDATE
+)
 
 
 //
@@ -41,11 +60,20 @@ type ApplyMsg struct {
 // A Go object implementing a single Raft peer.
 //
 type Raft struct {
-	mu        sync.Mutex
-	peers     []*labrpc.ClientEnd
-	persister *Persister
-	me        int // index into peers[]
+	mu        	sync.Mutex
+	peers     	[]*labrpc.ClientEnd
+	persister 	*Persister
+	me        	int // index into peers[]
 
+	role		int // raft node 的状态：follower\candidate\leader
+
+	currentTerm	int				// 服务器最后一次知道的任期号（初始化为 0，持续递增）
+	votedFor	int				// 在当前获得选票的候选人的 Id
+	logs		[]LogEntry		// 日志条目集；每一个条目包含一个用户状态机执行的指令，和收到时的任期号
+
+	voteCount	int 			// 成为 candidate 后，获得的选票
+
+	chanLeader	chan bool		// 成为 leader 进行通知
 	// Your data here.
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
@@ -73,6 +101,17 @@ type Raft struct {
 	*/
 
 }
+
+
+// setter and getter
+func GetRole(rt *Raft) int {
+	return rt.role
+}
+
+func IsRole(rt *Raft) bool {
+	return rt.role == ROLE_LEADER
+}
+
 
 // return currentTerm and whether this server
 // believes it is the leader.
@@ -115,17 +154,21 @@ func (rf *Raft) readPersist(data []byte) {
 
 
 //
-// example RequestVote RPC arguments structure.
+// RequestVote RPC arguments structure.
 //
 type RequestVoteArgs struct {
-	// Your data here.
+	Term			int		// 候选人的任期号
+	CandidateId		int		// 请求选票的候选人的 Id
+	LastLogIndex	int		// 候选人的最后日志条目的索引值
+	LastLogTerm		int		// 候选人最后日志条目的任期号
 }
 
 //
-// example RequestVote RPC reply structure.
+// RequestVote RPC reply structure.
 //
 type RequestVoteReply struct {
-	// Your data here.
+	Term			int 	// 当前任期号，以便于候选人去更新自己的任期号
+	VoteGranted		bool	// 候选人赢得了此张选票时为真
 }
 
 //
@@ -154,9 +197,70 @@ func (rf *Raft) RequestVote(args RequestVoteArgs, reply *RequestVoteReply) {
 //
 func (rf *Raft) sendRequestVote(server int, args RequestVoteArgs, reply *RequestVoteReply) bool {
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
+
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	if ok {
+		term := rf.currentTerm
+		if ROLE_CANDIDATE != rf.role {
+			return ok
+		}
+		if args.Term != term {
+			return ok
+		}
+		if reply.Term > term {
+			rf.currentTerm = reply.Term
+			rf.role = ROLE_FOLLOWER
+			rf.votedFor = -1
+			rf.persist()
+		}
+		if reply.VoteGranted {
+			rf.voteCount++
+			if rf.role == ROLE_CANDIDATE && rf.voteCount > len(rf.peers)/2 {
+				rf.role = ROLE_LEADER
+				rf.chanLeader <- true
+			}
+		}
+	}
+
 	return ok
 }
 
+//
+// when node to be a candidate, it will start a leader election
+// the node try to request all nodes that in a same cluster.
+func (rf *Raft) broadcastRequestVote() {
+	var voteArgs = RequestVoteArgs{}
+	rf.mu.Lock()
+	voteArgs.Term = rf.currentTerm
+	voteArgs.CandidateId = rf.me
+	voteArgs.LastLogIndex = rf.getLastLogIndex()
+	voteArgs.LastLogTerm = rf.getLastLogTerm()
+	rf.mu.Unlock()
+
+	for peer := range rf.peers {
+		if ROLE_CANDIDATE == rf.role {
+			go func(id int) {
+				var voteReply RequestVoteReply
+				rf.sendRequestVote(peer, voteArgs, &voteReply)
+			}(peer)
+		}
+	}
+}
+
+
+//
+//
+func (rf *Raft) getLastLogIndex() int {
+	// todo
+	return -1
+}
+
+func (rf *Raft) getLastLogTerm() int {
+	// todo
+	return -1
+}
 
 //
 // the service using Raft (e.g. a k/v server) wants to start
@@ -188,6 +292,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 //
 func (rf *Raft) Kill() {
 	// Your code here, if desired.
+	// todo how to kill a raft node.
 }
 
 //
@@ -204,16 +309,66 @@ func (rf *Raft) Kill() {
 // 建一个Raft端点。
 // peers参数是通往其他Raft端点处于连接状态下的RPC连接。
 // me参数是自己在端点数组中的索引。
+//
+// applyCh 参数是实验收集器。当最近的日志项被提交时，发送一条ApplyMsg到applyCh。
 func Make(peers []*labrpc.ClientEnd,
 	me int,
 	persister *Persister,
 	applyCh chan ApplyMsg) *Raft {
+
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister
 	rf.me = me
+	rf.role = ROLE_FOLLOWER
+	// todo raft node init
 
 	// Your initialization code here.
+	// start groutines.
+	go func() {
+		// + kick off leader election periodically by sending out RequestVote RPCs
+		// 	when it hasn't heard from another peer for a while.
+		// + This way a peer will learn who is the leader, if there is already a leader,
+		// 	or become the leader itself.
+		for {
+			switch rf.role {
+			case ROLE_FOLLOWER:
+				select {
+				// block：follower 超时并转化为 candidate
+				case <- time.After(time.Duration(rand.Int63() % 333 + 550) * time.Millisecond):
+					rf.role = ROLE_CANDIDATE
+				// todo maybe there are some other msg case...
+				}
+			case ROLE_CANDIDATE:
+				//	一旦成为 candidate 开启新一轮投票
+				// 	+ 自己的 term 加一
+				// 	+ 给自己投票
+				// 	+ 向其他节点询问投票
+				//	+ 等待投票结果(select)
+				rf.mu.Lock()
+				rf.currentTerm++
+				rf.votedFor = rf.me
+				go rf.broadcastRequestVote()
+				select {
+				case <- time.After(time.Duration(rand.Int63() % 333 + 550) * time.Millisecond):
+					// block: candidate 状态下的超时
+					// 重新进入 candidate 状态
+				case <- rf.chanLeader:
+					// block: candidate 成功被选举为 leader
+					rf.mu.Lock()
+					rf.role = ROLE_LEADER
+					// todo
+					rf.mu.Unlock()
+				}
+				rf.mu.Unlock()
+
+			case ROLE_LEADER:
+				// + 向其他的 follower 发送 AppendEntry.
+				// todo
+			}
+		}
+	}()
+
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())

@@ -3,9 +3,9 @@ package raft
 //
 // Raft tests.
 //
-// we will use the original test_test.go to test your code for grading.
+// we will use the original test_test.go to tips your code for grading.
 // so, while you can modify this code to help you debug, please
-// test with the original before submitting.
+// tips with the original before submitting.
 //
 
 import "testing"
@@ -22,7 +22,7 @@ import "sync"
 // 译注： 论文中的选举超时时间可能需要在 10 毫秒到 500 毫秒之间
 //const RaftElectionTimeout = 1000 * time.Millisecond
 
-// go test -v  -run TestInitialElection
+// go tips -v  -run TestInitialElection
 func TestInitialElection(t *testing.T) {
 	servers := 3
 	cfg := make_config(t, servers, false) // servers是实例数量,false为不可靠网络(创建Raft实例)

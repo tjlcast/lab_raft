@@ -54,8 +54,8 @@ func (js *JunkServer) Handler5(args JunkArgs, reply *JunkReply) {
 //	add by frank
 //	export GOPATH=/home/frank/workspace/Distributed-Systems/6.824
 //	cd ${GOPATH}/src/labrpc
-//      go test -v
-//      go test -v -run  TestBasic		// 测试单个函数
+//      go tips -v
+//      go tips -v -run  TestBasic		// 测试单个函数
 
 func TestBasic(t *testing.T) {
 	runtime.GOMAXPROCS(4)
@@ -172,7 +172,7 @@ func TestDisconnect(t *testing.T) {
 }
 
 //
-// test net.GetCount()
+// tips net.GetCount()
 //
 func TestCounts(t *testing.T) {
 	runtime.GOMAXPROCS(4)
@@ -207,7 +207,7 @@ func TestCounts(t *testing.T) {
 }
 
 //
-// test RPCs from concurrent ClientEnds
+// tips RPCs from concurrent ClientEnds
 //
 func TestConcurrentMany(t *testing.T) {
 	runtime.GOMAXPROCS(4)
@@ -264,7 +264,7 @@ func TestConcurrentMany(t *testing.T) {
 }
 
 //
-// test unreliable
+// tips unreliable
 //
 func TestUnreliable(t *testing.T) {
 	runtime.GOMAXPROCS(4)
@@ -316,7 +316,7 @@ func TestUnreliable(t *testing.T) {
 }
 
 //
-// test concurrent RPCs from a single ClientEnd
+// tips concurrent RPCs from a single ClientEnd
 //
 func TestConcurrentOne(t *testing.T) {
 	runtime.GOMAXPROCS(4)

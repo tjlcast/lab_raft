@@ -176,6 +176,45 @@ type RequestVoteReply struct {
 //
 func (rf *Raft) RequestVote(args RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here.
+
+	// step.1 加锁
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	// todo
+
+	reply.VoteGranted = false
+
+	// step.2 当前自己知道有较新的 term
+	if args.Term < rf.currentTerm {
+		reply.Term = rf.currentTerm
+		return
+	}
+
+	if args.Term > rf.currentTerm {
+		rf.currentTerm = args.Term
+		rf.role = ROLE_FOLLOWER
+		rf.votedFor = -1
+	}
+	reply.Term = rf.currentTerm
+
+	term := rf.getLastLogTerm()
+	index := rf.getLastLogIndex()
+	uptoDate := false
+
+	if args.LastLogTerm > term {
+		uptoDate = true
+	}
+	if args.LastLogTerm > term && args.LastLogIndex > index {
+		uptoDate = true
+	}
+
+	if (rf.votedFor == -1 || rf.votedFor == args.CandidateId) && uptoDate {
+		// rf.chanGrantVote <- true
+		rf.role = ROLE_FOLLOWER
+		reply.VoteGranted = true
+		rf.votedFor = args.CandidateId
+	}
+
 }
 
 //
@@ -198,6 +237,9 @@ func (rf *Raft) RequestVote(args RequestVoteArgs, reply *RequestVoteReply) {
 func (rf *Raft) sendRequestVote(server int, args RequestVoteArgs, reply *RequestVoteReply) bool {
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
 
+	//
+	// 发送请求，阻塞等待网路请求结束.
+	// 之后把结果向 上级 报告（扇入|扇出）
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
@@ -357,7 +399,7 @@ func Make(peers []*labrpc.ClientEnd,
 					// block: candidate 成功被选举为 leader
 					rf.mu.Lock()
 					rf.role = ROLE_LEADER
-					// todo
+					// todo prepare to be a leader
 					rf.mu.Unlock()
 				}
 				rf.mu.Unlock()
